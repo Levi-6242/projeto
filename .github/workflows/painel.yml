@@ -1,0 +1,48 @@
+# Mantém o painel do pastor em dia SEM depender de computador nenhum ligado.
+#
+# Antes isto rodava numa tarefa do Windows, na máquina do Levi. Aqui roda na nuvem do
+# próprio GitHub, de graça (repositório público não consome minutos), o que tira o
+# projeto de depender de uma pessoa específica -- que era o pedido desde o começo.
+#
+# Este arquivo vive em .github/workflows/ dentro do repositório do painel.
+name: Atualizar painel
+
+on:
+  schedule:
+    # A cada 5 minutos. O GitHub às vezes atrasa alguns minutos em horário de pico;
+    # para lista de aniversário isso é irrelevante.
+    - cron: '*/5 * * * *'
+  workflow_dispatch:   # permite rodar na mão pelo site, quando quiser conferir
+
+# O ciclo precisa escrever a lista de volta no repositório.
+permissions:
+  contents: write
+
+# Se uma execução demorar mais que 5 minutos, a próxima espera em vez de rodar por
+# cima -- duas publicando ao mesmo tempo brigariam pelo mesmo arquivo.
+concurrency:
+  group: painel
+  cancel-in-progress: false
+
+jobs:
+  ciclo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install --quiet 'cryptography>=42'
+
+      - name: Baixar cadastros e atualizar a lista
+        env:
+          # Os três vêm dos Secrets do repositório, nunca do código. O GitHub mascara
+          # esses valores automaticamente no log -- o que importa aqui, porque em
+          # repositório público qualquer um lê os logs.
+          NETLIFY_TOKEN: ${{ secrets.NETLIFY_TOKEN }}
+          PAINEL_SENHA: ${{ secrets.PAINEL_SENHA }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python ferramentas/ciclo.py
