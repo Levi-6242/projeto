@@ -40,12 +40,12 @@ ITERACOES = 210_000   # mesmo número no painel; PBKDF2-SHA256
 # Campos que o painel usa. Tudo que não estiver aqui não sai do Netlify -- o arquivo
 # publicado não carrega e-mail nem consentimento à toa.
 #
-# 20/09/2026: ENDEREÇO e BAIRRO saíram daqui de propósito. O arquivo fica num endereço
-# público e a senha passou a ser fácil de lembrar, a pedido do Levi -- e senha fácil com
-# endereço residencial dentro é o endereço da casa de 51 famílias legível para quem achar
-# o link. Elas deram isso para a igreja, não para a internet. O dado continua existindo
-# no Netlify e no backup local; só não é publicado.
-CAMPOS = ("nome", "nascimento", "whatsapp", "departamento", "como")
+# 20/09/2026: endereço e bairro saíram, e voltaram no mesmo dia. O que decide isso é a
+# SENHA, não o campo: o arquivo fica num endereço público, então ele só pode carregar
+# endereço residencial enquanto a senha for forte o bastante para ninguém abrir.
+# Com a senha de código (av3h-...), pode. Se um dia ela virar algo fácil de lembrar,
+# endereço e bairro têm que sair daqui de novo.
+CAMPOS = ("nome", "nascimento", "whatsapp", "endereco", "bairro", "departamento", "como")
 
 
 def limpar(registros):
