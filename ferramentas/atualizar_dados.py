@@ -55,7 +55,7 @@ def limpar(registros):
     por aqui deixaria os endereços antigos no arquivo para sempre, porque o GitHub
     acumula em vez de substituir.
     """
-    permitidos = set(CAMPOS) | {"tipo"}
+    permitidos = set(CAMPOS) | {"tipo", "conferir"}
     return [{c: v for c, v in r.items() if c in permitidos} for r in registros]
 
 
@@ -125,6 +125,11 @@ def resgatar_do_spam(token):
                 continue
             reg = {c: str(dados.get(c, "")).strip() for c in CAMPOS if dados.get(c)}
             reg["tipo"] = "visitante" if "visitante" in nome_form else "membro"
+            # O carimbo vai DENTRO da lista cifrada, e não num log à parte, porque o
+            # repositório é público: "resgatado do spam: Fulano" num arquivo de texto
+            # deixaria nome de gente real legível para qualquer um, para sempre.
+            # Assim a revisão semanal acontece no painel, onde o dado já está protegido.
+            reg["conferir"] = "spam"
             resgatados.append(reg)
     return resgatados
 
