@@ -69,9 +69,22 @@ def main():
             guardados = pacote.get("registros", [])
 
         chegando = atualizar_dados.baixar(tok_netlify)
+
+        # O que o filtro da Netlify separou como spam entra também. Cada um é anotado
+        # no log pelo nome, e é essa anotação que vocês revisam com o pastor por semana.
+        presos = atualizar_dados.resgatar_do_spam(tok_netlify)
+        ja_tem = {(r.get("nome", "").strip().lower(), r.get("nascimento", "").strip())
+                  for r in guardados + chegando}
+        novos_do_spam = [r for r in presos
+                         if (r.get("nome", "").strip().lower(),
+                             r.get("nascimento", "").strip()) not in ja_tem]
+        for r in novos_do_spam:
+            registrar(f"resgatado do spam: {r.get('nome')} -- conferir na revisão")
+
         # limpar() vale para os dois lados: tira do que chega E do que já estava
         # guardado o que não pode ser publicado.
-        registros = atualizar_dados.limpar(atualizar_dados.juntar(guardados, chegando))
+        registros = atualizar_dados.limpar(
+            atualizar_dados.juntar(guardados, chegando + novos_do_spam))
 
         agora = atualizar_dados.impressao(registros)
         antes = atualizar_dados.impressao(guardados)
