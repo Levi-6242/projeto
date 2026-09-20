@@ -22,6 +22,7 @@ Uso:
 """
 from datetime import datetime
 from pathlib import Path
+import json
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -31,7 +32,6 @@ import github
 import netlify
 
 FERR = Path(__file__).resolve().parent
-ASSINATURA = "ultima_lista.txt"   # mora NO REPOSITÓRIO, ao lado da lista
 LOG = FERR / "log-automacao.txt"
 
 
@@ -60,25 +60,31 @@ def main():
         quem = github.dono(tok_github)
         senha = atualizar_dados.segredo("senha_painel.txt",
                                         "a senha que o pastor vai digitar no painel")
-        registros = atualizar_dados.baixar(tok_netlify)
+        # O que já está guardado no GitHub é a lista de verdade; o Netlify só traz
+        # quem chegou desde então. A lista cresce, nunca é substituída.
+        publicado = github.ler(tok_github, quem, "dados.enc")
+        guardados = []
+        if publicado:
+            pacote = json.loads(atualizar_dados.decifrar(publicado.decode("ascii"), senha))
+            guardados = pacote.get("registros", [])
+
+        chegando = atualizar_dados.baixar(tok_netlify)
+        registros = atualizar_dados.juntar(guardados, chegando)
 
         agora = atualizar_dados.impressao(registros)
-        publicada = github.ler(tok_github, quem, ASSINATURA)
-        antes = publicada.decode("ascii").strip() if publicada else ""
+        antes = atualizar_dados.impressao(guardados)
         if agora == antes:
-            print("sem novidade -- nada enviado")
+            print(f"sem novidade -- {len(registros)} cadastros guardados")
             return 0
 
         arquivo, _ = atualizar_dados.gravar(registros, senha)
         github.gravar(tok_github, quem, arquivo.name, arquivo.read_bytes(),
                       f"{len(registros)} cadastros")
 
-        # A assinatura só é gravada DEPOIS de a lista subir. Se o envio da lista falhar,
-        # ela continua velha e o próximo ciclo tenta de novo em 5 minutos.
-        github.gravar(tok_github, quem, ASSINATURA, agora, f"assinatura de {len(registros)}")
         membros = sum(1 for r in registros if r["tipo"] == "membro")
-        registrar(f"painel atualizado: {len(registros)} cadastros ({membros} membros)")
-        print(f"painel atualizado: {len(registros)} cadastros")
+        novos = len(registros) - len(guardados)
+        registrar(f"painel atualizado: +{novos} | {len(registros)} cadastros ({membros} membros)")
+        print(f"painel atualizado: +{novos} novo(s), {len(registros)} no total")
         return 0
 
     except (Exception, SystemExit) as erro:
