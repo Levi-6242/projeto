@@ -69,7 +69,9 @@ def main():
             guardados = pacote.get("registros", [])
 
         chegando = atualizar_dados.baixar(tok_netlify)
-        registros = atualizar_dados.juntar(guardados, chegando)
+        # limpar() vale para os dois lados: tira do que chega E do que já estava
+        # guardado o que não pode ser publicado.
+        registros = atualizar_dados.limpar(atualizar_dados.juntar(guardados, chegando))
 
         agora = atualizar_dados.impressao(registros)
         antes = atualizar_dados.impressao(guardados)
