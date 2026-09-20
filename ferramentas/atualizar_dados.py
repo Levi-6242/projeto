@@ -39,7 +39,24 @@ ITERACOES = 210_000   # mesmo número no painel; PBKDF2-SHA256
 
 # Campos que o painel usa. Tudo que não estiver aqui não sai do Netlify -- o arquivo
 # publicado não carrega e-mail nem consentimento à toa.
-CAMPOS = ("nome", "nascimento", "whatsapp", "endereco", "bairro", "departamento", "como")
+#
+# 20/09/2026: ENDEREÇO e BAIRRO saíram daqui de propósito. O arquivo fica num endereço
+# público e a senha passou a ser fácil de lembrar, a pedido do Levi -- e senha fácil com
+# endereço residencial dentro é o endereço da casa de 51 famílias legível para quem achar
+# o link. Elas deram isso para a igreja, não para a internet. O dado continua existindo
+# no Netlify e no backup local; só não é publicado.
+CAMPOS = ("nome", "nascimento", "whatsapp", "departamento", "como")
+
+
+def limpar(registros):
+    """Deixa em cada cadastro só o que pode ser publicado.
+
+    Vale também para quem JÁ estava na lista: trocar os campos publicados sem passar
+    por aqui deixaria os endereços antigos no arquivo para sempre, porque o GitHub
+    acumula em vez de substituir.
+    """
+    permitidos = set(CAMPOS) | {"tipo"}
+    return [{c: v for c, v in r.items() if c in permitidos} for r in registros]
 
 
 # Cada segredo tem um arquivo aqui no computador e uma variável correspondente na
