@@ -172,6 +172,15 @@
   select{flex:0 0 auto; cursor:pointer;}
   option{background:var(--cartao); color:var(--branco);}
 
+  .baixar{
+    flex:0 0 auto; font-family:inherit; font-size:15px; font-weight:600;
+    color:var(--branco); background:var(--campo);
+    border:1.5px solid var(--linha); border-radius:12px;
+    padding:12px 18px; min-height:48px; cursor:pointer;
+  }
+  .baixar:disabled{opacity:0.55; cursor:default;}
+  @media (hover:hover){ .baixar:hover:not(:disabled){border-color:rgba(255,255,255,0.4);} }
+
   /* ---------- modelo da mensagem ---------- */
   .modelo{background:var(--cartao); border:1px solid var(--linha); border-radius:15px; padding:16px 18px; margin-bottom:20px;}
   .modelo label{font-size:11px; font-weight:700; letter-spacing:0.13em; text-transform:uppercase; color:var(--texto-3); display:block; margin-bottom:9px;}
@@ -271,6 +280,7 @@
           <option value="membro">Só membros</option>
           <option value="visitante">Só visitantes</option>
         </select>
+        <button type="button" id="baixar" class="baixar">Baixar planilha</button>
       </div>
       <div id="l-pessoas"></div>
     </div>
@@ -581,6 +591,211 @@
     preencher('l-mes', lista, hoje, false, 'Nenhum aniversário em ' + MESES[m] + '.');
   }
 
+  // ---------- planilha (.xlsx) ----------
+  // Um .xlsx é um zip com XMLs dentro. Montar isso aqui evita carregar uma biblioteca
+  // de quase 1 MB no celular do pastor só para um botão -- e a página segue funcionando
+  // sem internet e sem depender de CDN nenhum.
+  //
+  // Este XML foi validado abrindo o arquivo no Excel de verdade antes de entrar aqui:
+  // xlsx levemente malformado o Excel recusa inteiro, e no celular dele não haveria
+  // como investigar o motivo.
+
+  var COLUNAS = ['Nome', 'Nascimento', 'WhatsApp', 'Endereço', 'Bairro', 'Departamento', 'Tipo'];
+  var LARGURAS = [30, 13, 18, 34, 20, 20, 12];
+
+  function escaparXml(t){
+    return String(t == null ? '' : t)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function letraColuna(n){
+    var s = '';
+    while (n > 0) { var r = (n - 1) % 26; s = String.fromCharCode(65 + r) + s; n = (n - 1 - r) / 26; }
+    return s;
+  }
+
+  function celulaXml(ref, valor, estilo){
+    return '<c r="' + ref + '" s="' + estilo + '" t="inlineStr"><is><t xml:space="preserve">'
+         + escaparXml(valor) + '</t></is></c>';
+  }
+
+  function folhaXml(linhas){
+    var partes = [];
+    var cab = COLUNAS.map(function(c, i){ return celulaXml(letraColuna(i + 1) + '1', c, 1); }).join('');
+    partes.push('<row r="1" ht="22" customHeight="1">' + cab + '</row>');
+
+    linhas.forEach(function(dados, n){
+      var r = n + 2;
+      // estilos 2 e 3 alternam para dar o zebrado
+      var estilo = (r % 2 === 0) ? 2 : 3;
+      var cels = dados.map(function(v, i){ return celulaXml(letraColuna(i + 1) + r, v, estilo); }).join('');
+      partes.push('<row r="' + r + '">' + cels + '</row>');
+    });
+
+    var cols = LARGURAS.map(function(w, i){
+      return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="1"/>';
+    }).join('');
+    var ultima = letraColuna(COLUNAS.length) + (linhas.length + 1);
+
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+      + '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+      + '<dimension ref="A1:' + ultima + '"/>'
+      + '<sheetViews><sheetView workbookViewId="0" tabSelected="1">'
+      + '<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/>'
+      + '</sheetView></sheetViews>'
+      + '<sheetFormatPr defaultRowHeight="15"/>'
+      + '<cols>' + cols + '</cols>'
+      + '<sheetData>' + partes.join('') + '</sheetData>'
+      + '<autoFilter ref="A1:' + letraColuna(COLUNAS.length) + '1"/>'
+      + '</worksheet>';
+  }
+
+  var ESTILOS_XML = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    + '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+    + '<fonts count="2">'
+    + '<font><sz val="11"/><color rgb="FF1C1A17"/><name val="Calibri"/></font>'
+    + '<font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>'
+    + '</fonts>'
+    + '<fills count="4">'
+    + '<fill><patternFill patternType="none"/></fill>'
+    + '<fill><patternFill patternType="gray125"/></fill>'
+    + '<fill><patternFill patternType="solid"><fgColor rgb="FF1C1A17"/><bgColor indexed="64"/></patternFill></fill>'
+    + '<fill><patternFill patternType="solid"><fgColor rgb="FFF6F4F0"/><bgColor indexed="64"/></patternFill></fill>'
+    + '</fills>'
+    + '<borders count="2">'
+    + '<border><left/><right/><top/><bottom/><diagonal/></border>'
+    + '<border><left/><right/><top/><bottom style="thin"><color rgb="FFE3DFD8"/></bottom><diagonal/></border>'
+    + '</borders>'
+    + '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
+    + '<cellXfs count="4">'
+    + '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
+    + '<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center"/></xf>'
+    + '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"/>'
+    + '<xf numFmtId="0" fontId="0" fillId="3" borderId="1" xfId="0" applyFill="1" applyBorder="1"/>'
+    + '</cellXfs>'
+    + '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
+    + '</styleSheet>';
+
+  // ---- zip mínimo, sem compressão (método "store"), que é válido para .xlsx ----
+  var TABELA_CRC = (function(){
+    var t = new Uint32Array(256);
+    for (var i = 0; i < 256; i++) {
+      var c = i;
+      for (var j = 0; j < 8; j++) { c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); }
+      t[i] = c >>> 0;
+    }
+    return t;
+  })();
+
+  function crc32(bytes){
+    var c = 0xFFFFFFFF;
+    for (var i = 0; i < bytes.length; i++) { c = TABELA_CRC[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8); }
+    return (c ^ 0xFFFFFFFF) >>> 0;
+  }
+
+  function zipar(arquivos){
+    var codificador = new TextEncoder();
+    var locais = [], central = [], deslocamento = 0;
+
+    arquivos.forEach(function(a){
+      var nome = codificador.encode(a.nome);
+      var dados = codificador.encode(a.conteudo);
+      var crc = crc32(dados);
+
+      var cab = new DataView(new ArrayBuffer(30));
+      cab.setUint32(0, 0x04034b50, true);
+      cab.setUint16(4, 20, true);
+      cab.setUint16(6, 0x0800, true);   // nomes em UTF-8
+      cab.setUint16(8, 0, true);        // sem compressão
+      cab.setUint32(14, crc, true);
+      cab.setUint32(18, dados.length, true);
+      cab.setUint32(22, dados.length, true);
+      cab.setUint16(26, nome.length, true);
+      locais.push(new Uint8Array(cab.buffer), nome, dados);
+
+      var cen = new DataView(new ArrayBuffer(46));
+      cen.setUint32(0, 0x02014b50, true);
+      cen.setUint16(4, 20, true);
+      cen.setUint16(6, 20, true);
+      cen.setUint16(8, 0x0800, true);
+      cen.setUint16(10, 0, true);
+      cen.setUint32(16, crc, true);
+      cen.setUint32(20, dados.length, true);
+      cen.setUint32(24, dados.length, true);
+      cen.setUint16(28, nome.length, true);
+      cen.setUint32(42, deslocamento, true);
+      central.push(new Uint8Array(cen.buffer), nome);
+
+      deslocamento += 30 + nome.length + dados.length;
+    });
+
+    var tamanhoCentral = central.reduce(function(s, p){ return s + p.length; }, 0);
+    var fim = new DataView(new ArrayBuffer(22));
+    fim.setUint32(0, 0x06054b50, true);
+    fim.setUint16(8, arquivos.length, true);
+    fim.setUint16(10, arquivos.length, true);
+    fim.setUint32(12, tamanhoCentral, true);
+    fim.setUint32(16, deslocamento, true);
+
+    return new Blob(locais.concat(central, [new Uint8Array(fim.buffer)]),
+                    { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  }
+
+  function doisDigitos(n){ return (n < 10 ? '0' : '') + n; }
+
+  function planilhaDe(lista){
+    var linhas = lista.map(function(r){
+      var nasc = r.nasc
+        ? doisDigitos(r.nasc.dia) + '/' + doisDigitos(r.nasc.mes + 1) + '/' + r.nasc.ano
+        : '';
+      return [r.nome, nasc, r.zap, r.endereco, r.bairro, r.depto,
+              r.tipo === 'visitante' ? 'Visitante' : 'Membro'];
+    });
+
+    return zipar([
+      { nome: '[Content_Types].xml', conteudo:
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        + '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        + '<Default Extension="xml" ContentType="application/xml"/>'
+        + '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+        + '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+        + '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
+        + '</Types>' },
+      { nome: '_rels/.rels', conteudo:
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        + '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
+        + '</Relationships>' },
+      { nome: 'xl/workbook.xml', conteudo:
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        + '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+        + 'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+        + '<sheets><sheet name="Cadastros" sheetId="1" r:id="rId1"/></sheets></workbook>' },
+      { nome: 'xl/_rels/workbook.xml.rels', conteudo:
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        + '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
+        + '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
+        + '</Relationships>' },
+      { nome: 'xl/styles.xml', conteudo: ESTILOS_XML },
+      { nome: 'xl/worksheets/sheet1.xml', conteudo: folhaXml(linhas) }
+    ]);
+  }
+
+  function baixarPlanilha(lista){
+    var hoje = new Date();
+    var nome = 'cadastros-sal-e-luz-' + hoje.getFullYear() + '-'
+             + doisDigitos(hoje.getMonth() + 1) + '-' + doisDigitos(hoje.getDate()) + '.xlsx';
+    var url = URL.createObjectURL(planilhaDe(lista));
+    var a = document.createElement('a');
+    a.href = url; a.download = nome;
+    document.body.appendChild(a); a.click(); a.remove();
+    // Soltar o endereço temporário depois do clique: sem isso o arquivo fica preso na
+    // memória do navegador até a aba fechar.
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  }
+
   function desenharPessoas(hoje){
     function aplicar(){
       var termo = semAcento(document.getElementById('busca').value);
@@ -592,6 +807,15 @@
             || soDigitos(r.zap).indexOf(soDigitos(termo)) >= 0 && soDigitos(termo).length > 2;
       }).sort(function(a, b){ return a.nome.localeCompare(b.nome, 'pt-BR'); });
       preencher('l-pessoas', lista, hoje, false, 'Nenhum cadastro encontrado.');
+
+      // A planilha sai com o que está na tela: filtrou por bairro ou por tipo, é isso
+      // que ela leva. Sem busca, leva tudo.
+      var botao = document.getElementById('baixar');
+      botao.disabled = lista.length === 0;
+      botao.textContent = lista.length === registros.length
+        ? 'Baixar planilha'
+        : 'Baixar planilha (' + lista.length + ')';
+      botao.onclick = function(){ baixarPlanilha(lista); };
     }
     document.getElementById('busca').oninput = aplicar;
     document.getElementById('filtro').onchange = aplicar;
@@ -605,6 +829,19 @@
 
   var ITERACOES = 210000;  // igual ao atualizar_dados.py
   var GUARDA = 'saleluz.painel.senha';
+
+  // De onde vem a lista. Endereço ABSOLUTO de propósito: assim esta mesma página
+  // funciona igual servida pelo GitHub Pages ou pela Netlify, e o dado mora num lugar
+  // só. Foi o que resolveu o problema de 19/09/2026, quando a Netlify passou a cobrar
+  // por publicação e cada cadastro novo custava crédito: agora a página é estática e
+  // nunca mais precisa ser republicada -- só o arquivo abaixo muda, de graça.
+  // (Trocou a conta ou o repositório? É só esta linha.)
+  var FONTE = 'https://levi-6242.github.io/projeto/';
+
+  // O GitHub guarda o arquivo em cache por 10 minutos. Sem furar isso, um cadastro novo
+  // demoraria até 15 minutos para aparecer (5 do ciclo + 10 do cache). O carimbo de
+  // tempo no fim do endereço faz a borda buscar a versão atual a cada visita.
+  function deOndeVem(nome){ return FONTE + nome + '?t=' + Date.now(); }
 
   function bytesDeBase64(b64){
     var bin = atob(b64.trim());
@@ -688,10 +925,10 @@
     // (nada a proteger). Entrando o primeiro cadastro, o script grava dados.enc no lugar
     // e a senha volta sozinha. O cifrado é procurado primeiro, então nunca há dúvida.
     var r = null;
-    try { r = await fetch('dados.enc', { cache: 'no-store' }); } catch (e) {}
+    try { r = await fetch(deOndeVem('dados.enc'), { cache: 'no-store' }); } catch (e) {}
     if (!r || !r.ok) {
       var aberto = null;
-      try { aberto = await fetch('dados.json', { cache: 'no-store' }); } catch (e) {}
+      try { aberto = await fetch(deOndeVem('dados.json'), { cache: 'no-store' }); } catch (e) {}
       if (aberto && aberto.ok) {
         adotar(await aberto.json());
         montar();
