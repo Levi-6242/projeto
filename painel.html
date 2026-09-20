@@ -279,6 +279,7 @@
           <option value="">Todos</option>
           <option value="membro">Só membros</option>
           <option value="visitante">Só visitantes</option>
+          <option value="conferir">A conferir</option>
         </select>
         <button type="button" id="baixar" class="baixar">Baixar planilha</button>
       </div>
@@ -489,6 +490,9 @@
     }
     if (r.bairro) { info.push(r.bairro); }
     if (r.depto) { info.push(r.depto); }
+    // Quem o filtro de spam tinha barrado entra igual, mas marcado: é o que vocês
+    // olham na revisão semanal com o pastor.
+    if (r.conferir) { info.push('conferir'); }
     if (!r.nasc && r.como) { info.push(r.como); }
     quem.innerHTML = '<div class="n"></div><div class="i"></div>';
     quem.querySelector('.n').textContent = r.nome;
@@ -803,7 +807,8 @@
       var termo = semAcento(document.getElementById('busca').value);
       var filtro = document.getElementById('filtro').value;
       var lista = registros.filter(function(r){
-        if (filtro && r.tipo !== filtro) { return false; }
+        if (filtro === 'conferir') { if (!r.conferir) { return false; } }
+        else if (filtro && r.tipo !== filtro) { return false; }
         if (!termo) { return true; }
         return semAcento(r.nome + ' ' + r.bairro + ' ' + r.depto + ' ' + r.endereco).indexOf(termo) >= 0
             || soDigitos(r.zap).indexOf(soDigitos(termo)) >= 0 && soDigitos(termo).length > 2;
@@ -876,6 +881,7 @@
         bairro: r.bairro || '',
         depto: r.departamento || '',
         como: r.como || '',
+        conferir: r.conferir === 'spam',
         tipo: r.tipo === 'visitante' ? 'visitante' : 'membro'
       };
     }).filter(function(r){ return r.nome; });
