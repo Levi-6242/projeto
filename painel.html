@@ -604,10 +604,8 @@
   // xlsx levemente malformado o Excel recusa inteiro, e no celular dele não haveria
   // como investigar o motivo.
 
-  // Endereço e bairro saíram em 20/09/2026: não são mais publicados, então as colunas
-  // viriam vazias. Quem precisar deles tira do backup, fora da web.
-  var COLUNAS = ['Nome', 'Nascimento', 'WhatsApp', 'Departamento', 'Tipo'];
-  var LARGURAS = [32, 14, 19, 22, 12];
+  var COLUNAS = ['Nome', 'Nascimento', 'WhatsApp', 'Endereço', 'Bairro', 'Departamento', 'Tipo'];
+  var LARGURAS = [30, 13, 18, 34, 20, 20, 12];
 
   function escaparXml(t){
     return String(t == null ? '' : t)
@@ -754,7 +752,7 @@
       var nasc = r.nasc
         ? doisDigitos(r.nasc.dia) + '/' + doisDigitos(r.nasc.mes + 1) + '/' + r.nasc.ano
         : '';
-      return [r.nome, nasc, r.zap, r.depto,
+      return [r.nome, nasc, r.zap, r.endereco, r.bairro, r.depto,
               r.tipo === 'visitante' ? 'Visitante' : 'Membro'];
     });
 
