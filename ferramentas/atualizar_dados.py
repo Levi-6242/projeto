@@ -97,6 +97,38 @@ def baixar(token):
     return registros
 
 
+def resgatar_do_spam(token):
+    """Traz para a lista TUDO que o filtro da Netlify separou como spam.
+
+    POR QUE ISSO EXISTE: em 20/09/2026, 10 cadastros enviados em 6 segundos do mesmo IP
+    viraram 6 aceitos e 4 marcados como spam. Num mutirão depois do culto -- todo mundo
+    no mesmo wifi da igreja, ao mesmo tempo -- os últimos seriam barrados SEM ninguém
+    receber erro. O filtro não dá para desligar: a Netlify não expõe isso, e a única
+    alternativa documentada é pôr reCAPTCHA, que atrapalharia justo os membros mais
+    velhos.
+
+    Decisão do Levi em 20/09: entra todo mundo, mesmo o que o filtro achou suspeito --
+    perder um membro de verdade é pior do que deixar entrar lixo, que dá para tirar
+    depois com o remover.py. A separação é feita por gente, na revisão semanal com o
+    pastor, e é por isso que cada resgatado vai para o log: o log É a lista da revisão.
+
+    Só o que não tem nome fica de fora, e não por julgamento: sem nome não há o que
+    mostrar no painel.
+    """
+    sid = netlify.site_id(token)
+    resgatados = []
+    for f in netlify.api(f"/sites/{sid}/forms", token):
+        nome_form = (f.get("name") or "").lower()
+        for e in netlify.api(f"/forms/{f['id']}/submissions?state=spam&per_page=1000", token):
+            dados = e.get("data") or {}
+            if not (dados.get("nome") or "").strip():
+                continue
+            reg = {c: str(dados.get(c, "")).strip() for c in CAMPOS if dados.get(c)}
+            reg["tipo"] = "visitante" if "visitante" in nome_form else "membro"
+            resgatados.append(reg)
+    return resgatados
+
+
 def cifrar(texto, senha):
     """salt(16) + nonce(12) + cifra, tudo junto em base64. O painel faz o inverso."""
     salt = os.urandom(16)
