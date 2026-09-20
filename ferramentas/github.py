@@ -57,7 +57,16 @@ def api(caminho, tok, dados=None, metodo=None):
 
 
 def dono(tok):
-    """De quem é este token. É ele que define a conta que hospeda o painel."""
+    """De quem é este token. É ele que define a conta que hospeda o painel.
+
+    Dentro do GitHub Actions não dá para perguntar: a credencial de lá pertence ao
+    REPOSITÓRIO, não a uma pessoa, e `/user` responde 403. Mas ali o dono já vem
+    pronto no ambiente, no formato "dono/repositorio".
+    """
+    import os
+    do_ambiente = os.environ.get("GITHUB_REPOSITORY", "")
+    if "/" in do_ambiente:
+        return do_ambiente.split("/")[0]
     return api("/user", tok)["login"]
 
 
