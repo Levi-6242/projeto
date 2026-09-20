@@ -90,6 +90,35 @@ def cifrar(texto, senha):
     return base64.b64encode(salt + nonce + cifra).decode("ascii")
 
 
+def decifrar(b64, senha):
+    """O inverso de cifrar(). Usado para ler o histórico herdado."""
+    bruto = base64.b64decode(b64)
+    salt, nonce, cifra = bruto[:16], bruto[16:28], bruto[28:]
+    chave = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt,
+                       iterations=ITERACOES).derive(senha.encode("utf-8"))
+    return AESGCM(chave).decrypt(nonce, cifra, None).decode("utf-8")
+
+
+def juntar(guardados, chegando):
+    """O GitHub ACUMULA; o Netlify é só a porta de entrada.
+
+    A lista publicada nunca é substituída pelo que o Netlify devolve -- ela só cresce.
+    Quem já está guardado continua guardado mesmo que suma da origem.
+
+    Isso nasceu de um problema real: em 20/09/2026 o site passou para outra conta do
+    Netlify e os formulários novos nasceram vazios. Se o ciclo espelhasse a origem, os
+    51 cadastros de então teriam sido apagados do painel no primeiro ciclo depois da
+    troca. Acumulando, uma conta nova (ou perdida) não leva ninguém junto.
+
+    A mesma pessoa não entra duas vezes: a comparação é por nome + nascimento.
+    """
+    def chave(r):
+        return (r.get("nome", "").strip().lower(), r.get("nascimento", "").strip())
+
+    vistos = {chave(r) for r in guardados}
+    return guardados + [r for r in chegando if chave(r) not in vistos]
+
+
 def impressao(registros):
     """Assinatura da lista: muda quando um cadastro entra, sai ou é corrigido, e NÃO
     muda quando o Netlify devolve os mesmos envios em outra ordem.
